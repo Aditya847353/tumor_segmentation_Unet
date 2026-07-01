@@ -4,7 +4,6 @@ A modern web application for AI-assisted brain tumor segmentation from multi-mod
 
 Note: This project is intended for research and educational purposes only and is not approved for clinical diagnosis.
 
-⸻
 
 Features
 
@@ -24,15 +23,13 @@ Features
 * Export inference results as JSON
 * Clean, responsive dark-themed interface
 
-⸻
 
 Demo
 
 Live Demo: (Add your Vercel URL here)
 
-Hugging Face Model: (Add your Hugging Face Space URL here)
+Hugging Face Model: https://huggingface.co/spaces/adityaAnand0/brain-tumor-demo
 
-⸻
 
 Tech Stack
 
@@ -56,30 +53,6 @@ Dataset
 
 * BraTS 2021 Dataset
 
-⸻
-
-Project Structure
-src/
-├── components/
-│   ├── site-header.tsx
-│   └── ui/
-│
-├── hooks/
-│
-├── lib/
-│   ├── analysis-store.tsx
-│   ├── hf-inference.functions.ts
-│   └── utils.ts
-│
-├── routes/
-│   ├── index.tsx
-│   ├── upload.tsx
-│   ├── processing.tsx
-│   ├── results.tsx
-│   └── __root.tsx
-│
-├── styles.css
-└── main.tsx
 Model Information
 
 * Architecture: 3D U-Net
