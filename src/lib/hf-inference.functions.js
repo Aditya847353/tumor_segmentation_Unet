@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+
 const SPACE = "https://adityaanand0-brain-tumor-demo.hf.space";
 async function uploadOne(file) {
   const fd = new FormData();
@@ -69,68 +69,82 @@ function asFileUrl(out) {
   }
   throw new Error("Expected Gradio file output, got: " + JSON.stringify(out));
 }
-export const runHfInference = createServerFn({ method: "POST" })
-  .inputValidator((data) => {
-    if (!(data instanceof FormData)) {
-      throw new Error("Expected FormData with FLAIR, T1, T1CE, T2 files");
+export async function runHfInference(data) {
+  const t0 = Date.now();
+
+  const channels = ["FLAIR", "T1", "T1CE", "T2"];
+
+  const files = {};
+
+  for (const c of channels) {
+    const f = data.get(c);
+
+    if (!(f instanceof File)) {
+      throw new Error(`Missing file for channel ${c}`);
     }
-    const channels = ["FLAIR", "T1", "T1CE", "T2"];
-    const files = {};
-    for (const c of channels) {
-      const f = data.get(c);
-      if (!(f instanceof File)) {
-        throw new Error(`Missing file for channel ${c}`);
-      }
-      files[c] = f;
-    }
-    return files;
-  })
-  .handler(async ({ data }) => {
-    const t0 = Date.now();
-    // 1. Upload all four files in parallel.
-    const [flair, t1, t1ce, t2] = await Promise.all([
-      uploadOne(data.FLAIR),
-      uploadOne(data.T1),
-      uploadOne(data.T1CE),
-      uploadOne(data.T2),
-    ]);
-    // 2. Kick off the prediction.
-    const callRes = await fetch(`${SPACE}/gradio_api/call/predict`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: [flair, t1, t1ce, t2] }),
-    });
-    if (!callRes.ok) {
-      throw new Error(
-        `Gradio call failed (${callRes.status}): ${await callRes.text().catch(() => "")}`,
-      );
-    }
-    const { event_id } = await callRes.json();
-    if (!event_id) throw new Error("Gradio did not return an event_id");
-    // 3. Stream the result (long — Space cold-start can be ~60s).
-    const streamRes = await fetch(`${SPACE}/gradio_api/call/predict/${event_id}`, {
-      headers: { Accept: "text/event-stream" },
-    });
-    if (!streamRes.ok) {
-      throw new Error(`Gradio stream failed (${streamRes.status})`);
-    }
-    const output = await readSseUntilComplete(streamRes);
-    // 4. Shape into the result the UI expects.
-    return {
-      flairUrl: asFileUrl(output[0]),
-      t1Url: asFileUrl(output[1]),
-      t1ceUrl: asFileUrl(output[2]),
-      t2Url: asFileUrl(output[3]),
-      maskUrl: asFileUrl(output[4]),
-      overlayUrl: asFileUrl(output[5]),
-      voxelCountsHtml: String(output[6]),
-      statusText: String(output[7]),
-      summaryMd: String(output[8]),
-      confidence: Number(output[9]),
-      // output[10] is the same pre-styled "Prediction Confidence" HTML
-      // block (badges + per-class bars) shown on the Hugging Face Space UI.
-      // Reusing it verbatim keeps the web app visually identical.
-      confidenceHtml: String(output[10] ?? ""),
-      inferenceMs: Date.now() - t0,
-    };
+
+    files[c] = f;
+  }
+
+  // Upload all four MRI volumes in parallel
+  const [flair, t1, t1ce, t2] = await Promise.all([
+    uploadOne(files.FLAIR),
+    uploadOne(files.T1),
+    uploadOne(files.T1CE),
+    uploadOne(files.T2),
+  ]);
+
+  // Start prediction
+  const callRes = await fetch(`${SPACE}/gradio_api/call/predict`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      data: [flair, t1, t1ce, t2],
+    }),
   });
+
+  if (!callRes.ok) {
+    throw new Error(
+      `Gradio call failed (${callRes.status}): ${await callRes.text().catch(() => "")}`
+    );
+  }
+
+  const { event_id } = await callRes.json();
+
+  if (!event_id) {
+    throw new Error("Gradio did not return an event_id");
+  }
+
+  // Wait for prediction to complete
+  const streamRes = await fetch(
+    `${SPACE}/gradio_api/call/predict/${event_id}`,
+    {
+      headers: {
+        Accept: "text/event-stream",
+      },
+    }
+  );
+
+  if (!streamRes.ok) {
+    throw new Error(`Gradio stream failed (${streamRes.status})`);
+  }
+
+  const output = await readSseUntilComplete(streamRes);
+
+  return {
+    flairUrl: asFileUrl(output[0]),
+    t1Url: asFileUrl(output[1]),
+    t1ceUrl: asFileUrl(output[2]),
+    t2Url: asFileUrl(output[3]),
+    maskUrl: asFileUrl(output[4]),
+    overlayUrl: asFileUrl(output[5]),
+    voxelCountsHtml: String(output[6]),
+    statusText: String(output[7]),
+    summaryMd: String(output[8]),
+    confidence: Number(output[9]),
+    confidenceHtml: String(output[10] ?? ""),
+    inferenceMs: Date.now() - t0,
+  };
+}

@@ -1,5 +1,4 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { Brain, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -27,7 +26,7 @@ const STAGES = [
 function ProcessingPage() {
   const navigate = useNavigate();
   const { files, setResult } = useAnalysis();
-  const runInference = useServerFn(runHfInference);
+  const runInference = runHfInference;
   const [stageIdx, setStageIdx] = useState(0);
   const [elapsedS, setElapsedS] = useState(0);
   const startedRef = useRef(false);
@@ -47,7 +46,7 @@ function ProcessingPage() {
     }, 1500);
     const fd = new FormData();
     for (const u of files) fd.append(u.channel, u.file, u.file.name);
-    runInference({ data: fd })
+    runInference(fd)
       .then((result) => {
         clearInterval(timer);
         setResult({ ...result, timestamp: new Date().toISOString() });
